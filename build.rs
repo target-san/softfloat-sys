@@ -30,11 +30,11 @@ fn main() {
         .parse_callbacks(Box::new(bindgen::CargoCallbacks))
         .generate()
         .expect("Unable to generate C99 type aliases");
-    
+
     bindings
         .write_to_file(PathBuf::from(env::var("OUT_DIR").unwrap()).join("c99-types.rs"))
         .expect("Couldn't write bindings");
-    
+
     //
     // Compile berkeley-softfloat manually,
     // makefiles provided support only in-tree compilation, which isn't what we want
@@ -59,7 +59,7 @@ fn main() {
     let softfloat_base = Path::new("berkeley-softfloat-3");
     let softfloat_source = softfloat_base.join(Path::new("source"));
     let softfloat_build = softfloat_base.join(Path::new("build"));
-    
+
     let primitive_sources = [
         "s_eq128.c",
         "s_le128.c",
@@ -391,8 +391,7 @@ fn main() {
                     .iter()
                     .map(|file| specialized_source_path.join(Path::new(file))),
             );
-    }
-    else if cfg!(all(target_arch = "wasm32")) {
+    } else if cfg!(all(target_arch = "wasm32")) {
         let specialized_source_path = softfloat_source.join(Path::new(SPEC_8086));
         builder
             .include(softfloat_build.join(Path::new("Wasm-Clang")))
