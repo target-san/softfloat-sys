@@ -26,7 +26,7 @@ fn main() {
 
     let bindings = bindgen::Builder::default()
         .header("c99-types.h")
-        //.use_core()
+        .use_core()
         .parse_callbacks(Box::new(bindgen::CargoCallbacks))
         .generate()
         .expect("Unable to generate C99 type aliases");
@@ -41,7 +41,7 @@ fn main() {
     //
 
     let mut builder = cc::Build::new();
-
+    // FIXME: use more stable way to detect `thread_local` alias
     let tool = builder.get_compiler();
     let thread_local = if tool.is_like_gnu() {
         let version = cc_version(&tool).expect("Failed to detect GCC version");

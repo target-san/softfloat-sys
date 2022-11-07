@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // See Notices.txt for copyright information
 
-// Disabled no-std mode, it requires core_ffi_c feature stabilized
-// #![cfg_attr(not(test), no_std)]
+#![cfg_attr(not(test), no_std)]
 #![allow(non_snake_case, non_camel_case_types, non_upper_case_globals)]
 
-#[allow(non_camel_case_types)]
 #[allow(unused)]
 mod internal {
+    extern crate core;
+
     pub type int8_t = i8;
     pub type int16_t = i16;
     pub type int32_t = i32;
