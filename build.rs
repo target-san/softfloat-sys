@@ -8,14 +8,121 @@ use cc_version::{cc_version, Version};
 use std::env;
 use std::path::{Path, PathBuf};
 
-const SPEC_8086: &str = "8086";
-const SPEC_8086_SSE: &str = "8086-SSE";
-#[allow(unused)]
-const SPEC_ARM_VFP_V2: &str = "ARM-VFPv2";
-#[allow(unused)]
-const SPEC_ARM_VFP_V2_DEFAULT_NAN: &str = "ARM-VFPv2-defaultNaN";
-#[allow(unused)]
-const SPEC_RISCV: &str = "RISCV";
+#[allow(unused, non_camel_case_types)]
+#[derive(Clone, Copy)]
+enum Specialization {
+    X8086,
+    X8086_SSE,
+    ARM_VFPv2,
+    ARM_VFPv2_DefaultNaN,
+    RISCV,
+}
+
+impl Specialization {
+    fn to_str(&self) -> &'static str {
+        match self {
+            Specialization::X8086 => "8086",
+            Specialization::X8086_SSE => "8086-SSE",
+            Specialization::ARM_VFPv2 => "ARM-VFPv2",
+            Specialization::ARM_VFPv2_DefaultNaN => "ARM-VFPv2-defaultNaN",
+            Specialization::RISCV => "RISCV",
+        }
+    }
+}
+
+#[allow(unused, non_camel_case_types)]
+#[derive(Clone, Copy)]
+enum BuildTarget {
+    Linux_386_GCC,
+    Linux_386_SSE2_GCC,
+    Linux_Arm_VFPv2_GCC,
+    Linux_x86_64_GCC,
+    Wasm_Clang,
+    Win32_MinGW,
+    Win32_SSE2_MinGW,
+    Win64_MinGW_w64,
+}
+
+impl BuildTarget {
+    fn to_str(&self) -> &'static str {
+        match self {
+            BuildTarget::Linux_386_GCC => "Linux-386-GCC",
+            BuildTarget::Linux_386_SSE2_GCC => "Linux-386-SSE2-GCC",
+            BuildTarget::Linux_Arm_VFPv2_GCC => "Linux-ARM-VFPv2-GCC",
+            BuildTarget::Linux_x86_64_GCC => "Linux-x86_64-GCC",
+            BuildTarget::Wasm_Clang => "Wasm-Clang",
+            BuildTarget::Win32_MinGW => "Win32-MinGW",
+            BuildTarget::Win32_SSE2_MinGW => "Win32-SSE2-MinGW",
+            BuildTarget::Win64_MinGW_w64 => "Win64-MinGW-w64",
+        }
+    }
+}
+
+struct Defines {
+    softfloat_round_odd: bool,
+    inline_level: Option<i32>,
+    softfloat_fast_div_32_to_16: bool,
+    softfloat_fast_div_64_to_32: bool,
+    softfloat_fast_int64: bool,
+}
+
+struct PlatformCfg<'a> {
+    softfloat_source: &'a Path,
+    softfloat_build: &'a Path,
+    primitive_sources: &'a [&'a str],
+    specialize_sources: &'a [&'a str],
+    other_sources: &'a [&'a str],
+    thread_local: Option<&'a str>,
+}
+
+impl<'a> PlatformCfg<'a> {
+    fn configure_platform(
+        &self,
+        builder: &mut cc::Build,
+        spec: Specialization,
+        target: BuildTarget,
+        defines: Defines,
+    ) {
+        let specialized_source_path = self.softfloat_source.join(Path::new(spec.to_str()));
+        builder
+            .include(self.softfloat_build.join(Path::new(target.to_str())))
+            .include(&specialized_source_path);
+
+        if defines.softfloat_round_odd {
+            builder.define("SOFTFLOAT_ROUND_ODD", None);
+        }
+
+        if let Some(level) = defines.inline_level {
+            builder.define("INLINE_LEVEL", Some(level.to_string().as_str()));
+        }
+
+        if defines.softfloat_fast_div_32_to_16 {
+            builder.define("SOFTFLOAT_FAST_DIV32TO16", None);
+        }
+
+        if defines.softfloat_fast_div_64_to_32 {
+            builder.define("SOFTFLOAT_FAST_DIV64TO32", None);
+        }
+
+        if defines.softfloat_fast_int64 {
+            builder.define("SOFTFLOAT_FAST_INT64", None);
+        }
+
+        builder
+            .define("THREAD_LOCAL", self.thread_local)
+            .files(
+                self.primitive_sources
+                    .iter()
+                    .chain(self.other_sources.iter())
+                    .map(|file| self.softfloat_source.join(Path::new(file))),
+            )
+            .files(
+                self.specialize_sources
+                    .iter()
+                    .map(|file| specialized_source_path.join(Path::new(file))),
+            );
+    }
+}
 
 fn main() {
     //
@@ -369,50 +476,41 @@ fn main() {
         "f128M_lt_quiet.c",
     ];
 
+    let platform_cfg = PlatformCfg {
+        softfloat_source: &softfloat_source,
+        softfloat_build: &softfloat_build,
+        primitive_sources: &primitive_sources,
+        specialize_sources: &specialize_sources,
+        other_sources: &other_sources,
+        thread_local,
+    };
+
     if cfg!(all(target_arch = "x86_64", target_os = "linux")) {
-        let specialized_source_path = softfloat_source.join(Path::new(SPEC_8086_SSE));
-        builder
-            .include(softfloat_build.join(Path::new("Linux-x86_64-GCC")))
-            .include(&specialized_source_path)
-            .define("SOFTFLOAT_ROUND_ODD", None)
-            .define("INLINE_LEVEL", Some("5"))
-            .define("SOFTFLOAT_FAST_DIV32TO16", None)
-            .define("SOFTFLOAT_FAST_DIV64TO32", None)
-            .define("SOFTFLOAT_FAST_INT64", None)
-            .define("THREAD_LOCAL", thread_local)
-            .files(
-                primitive_sources
-                    .iter()
-                    .chain(other_sources.iter())
-                    .map(|file| softfloat_source.join(Path::new(file))),
-            )
-            .files(
-                specialize_sources
-                    .iter()
-                    .map(|file| specialized_source_path.join(Path::new(file))),
-            );
+        platform_cfg.configure_platform(
+            &mut builder,
+            Specialization::X8086_SSE,
+            BuildTarget::Linux_x86_64_GCC,
+            Defines {
+                softfloat_round_odd: true,
+                inline_level: Some(5),
+                softfloat_fast_div_32_to_16: true,
+                softfloat_fast_div_64_to_32: true,
+                softfloat_fast_int64: true,
+            },
+        );
     } else if cfg!(all(target_arch = "wasm32")) {
-        let specialized_source_path = softfloat_source.join(Path::new(SPEC_8086));
-        builder
-            .include(softfloat_build.join(Path::new("Wasm-Clang")))
-            .include(&specialized_source_path)
-            .define("SOFTFLOAT_ROUND_ODD", None)
-            .define("INLINE_LEVEL", Some("5"))
-            .define("SOFTFLOAT_FAST_DIV32TO16", None)
-            .define("SOFTFLOAT_FAST_DIV64TO32", None)
-            .define("SOFTFLOAT_FAST_INT64", None)
-            .define("THREAD_LOCAL", thread_local)
-            .files(
-                primitive_sources
-                    .iter()
-                    .chain(other_sources.iter())
-                    .map(|file| softfloat_source.join(Path::new(file))),
-            )
-            .files(
-                specialize_sources
-                    .iter()
-                    .map(|file| specialized_source_path.join(Path::new(file))),
-            );
+        platform_cfg.configure_platform(
+            &mut builder,
+            Specialization::X8086,
+            BuildTarget::Wasm_Clang,
+            Defines {
+                softfloat_round_odd: true,
+                inline_level: Some(5),
+                softfloat_fast_div_32_to_16: true,
+                softfloat_fast_div_64_to_32: true,
+                softfloat_fast_int64: true,
+            },
+        );
     } else {
         unimplemented!("build rules are not implemented for the current target_arch and target_os");
     }
