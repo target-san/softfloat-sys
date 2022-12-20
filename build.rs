@@ -485,7 +485,9 @@ fn main() {
         thread_local,
     };
 
-    if cfg!(all(target_arch = "x86_64", target_os = "linux")) {
+    if cfg!(all(target_arch = "x86_64", target_os = "linux"))
+        || cfg!(all(target_arch = "x86_64", target_os = "macos"))
+    {
         platform_cfg.configure_platform(
             &mut builder,
             Specialization::X8086_SSE,
