@@ -369,7 +369,9 @@ fn main() {
         "f128M_lt_quiet.c",
     ];
 
-    if cfg!(all(target_arch = "x86_64", target_os = "linux")) {
+    if cfg!(all(target_arch = "x86_64", target_os = "linux"))
+        || cfg!(all(target_arch = "x86_64", target_os = "macos"))
+    {
         let specialized_source_path = softfloat_source.join(Path::new(SPEC_8086_SSE));
         builder
             .include(softfloat_build.join(Path::new("Linux-x86_64-GCC")))
