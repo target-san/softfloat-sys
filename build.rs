@@ -370,7 +370,7 @@ fn main() {
     ];
 
     if cfg!(all(target_arch = "x86_64", target_os = "linux"))
-        || cfg!(all(target_arch = "x86_64", target_os = "macos"))
+        || cfg!(target_os = "macos")
     {
         let specialized_source_path = softfloat_source.join(Path::new(SPEC_8086_SSE));
         builder
